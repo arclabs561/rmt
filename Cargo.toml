@@ -1,9 +1,11 @@
 [package]
 name = "rmt"
 version = "0.1.0"
+authors = ["Arc <attobop@gmail.com>"]
 edition = "2021"
 description = "Random matrix theory: Marchenko-Pastur, Wigner semicircle, eigenvalue statistics"
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/arclabs561/rmt"
 keywords = ["random-matrix", "eigenvalue", "marchenko-pastur", "wigner", "statistics"]
 categories = ["algorithms", "science", "mathematics"]
 
