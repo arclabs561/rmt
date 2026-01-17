@@ -1,0 +1,22 @@
+[package]
+name = "rmt"
+version = "0.1.0"
+authors = ["Arc <attobop@gmail.com>"]
+edition = "2021"
+description = "Random matrix theory: Marchenko-Pastur, Wigner semicircle, eigenvalue statistics"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/arclabs561/rmt"
+homepage = "https://github.com/arclabs561/rmt"
+documentation = "https://docs.rs/rmt"
+keywords = ["random-matrix", "eigenvalue", "marchenko-pastur", "wigner", "statistics"]
+categories = ["algorithms", "science", "mathematics"]
+
+[dependencies]
+thiserror = "2.0"
+ndarray = "0.16"
+rand = "0.9"
+rand_distr = "0.5"
+faer = "0.19"
+
+[dev-dependencies]
+proptest = "1.5"
