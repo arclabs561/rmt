@@ -209,7 +209,7 @@ pub fn sample_wishart_faer(n: usize, p: usize) -> Mat<f64> {
 
     // W = X^T X
     let mut w = Mat::<f64>::zeros(p, p);
-    faer::matmul::matmul(
+    faer::linalg::matmul::matmul(
         w.as_mut(),
         x.transpose(),
         x.as_ref(),
@@ -237,7 +237,9 @@ pub fn sample_wishart(n: usize, p: usize) -> Array2<f64> {
     let w = sample_wishart_faer(n, p);
     
     // Convert back to ndarray for compatibility with existing tests/APIs
-    Array2::from_shape_vec((p, p), w.as_ref().iter().copied().collect()).unwrap()
+    let data: Vec<f64> = w.as_ref().col_iter().flat_map(|col| col.iter().copied()).collect();
+    let a = Array2::from_shape_vec((p, p), data).unwrap();
+    Ok::<_, ndarray::ShapeError>(a.reversed_axes()).unwrap()
 }
 
 /// Sample a GOE (Gaussian Orthogonal Ensemble) matrix.
@@ -286,7 +288,9 @@ pub fn sample_goe_faer(n: usize) -> Mat<f64> {
 /// n × n symmetric random matrix
 pub fn sample_goe(n: usize) -> Array2<f64> {
     let m = sample_goe_faer(n);
-    Array2::from_shape_vec((n, n), m.as_ref().iter().copied().collect()).unwrap()
+    let data: Vec<f64> = m.as_ref().col_iter().flat_map(|col| col.iter().copied()).collect();
+    let a = Array2::from_shape_vec((n, n), data).unwrap();
+    Ok::<_, ndarray::ShapeError>(a.reversed_axes()).unwrap()
 }
 
 /// Level spacing ratio for eigenvalue sequence.
