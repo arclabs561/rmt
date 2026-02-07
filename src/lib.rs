@@ -14,7 +14,7 @@
 //! |--------------|-------------|---------|
 //! | [`marchenko_pastur`] | Wishart (X^T X) | Bounded support |
 //! | [`wigner_semicircle`] | Symmetric random | Semicircle |
-//! | [`tracy_widom`] | Largest eigenvalue | Skewed |
+//! | Tracy–Widom (edge; not implemented here) | Largest eigenvalue | Skewed |
 //!
 //! ## Quick Start
 //!
@@ -83,9 +83,10 @@
 //! - Wigner (1955). "Characteristic vectors of bordered matrices with infinite dimensions"
 //! - Johnstone (2001). "On the distribution of the largest eigenvalue in PCA"
 
-use ndarray::Array2;
 use faer::{Mat, Parallelism};
+use ndarray::Array2;
 use rand_distr::{Distribution, Normal};
+use statskit::stats;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -235,9 +236,13 @@ pub fn sample_wishart_faer(n: usize, p: usize) -> Mat<f64> {
 /// p × p Wishart matrix
 pub fn sample_wishart(n: usize, p: usize) -> Array2<f64> {
     let w = sample_wishart_faer(n, p);
-    
+
     // Convert back to ndarray for compatibility with existing tests/APIs
-    let data: Vec<f64> = w.as_ref().col_iter().flat_map(|col| col.iter().copied()).collect();
+    let data: Vec<f64> = w
+        .as_ref()
+        .col_iter()
+        .flat_map(|col| col.iter().copied())
+        .collect();
     let a = Array2::from_shape_vec((p, p), data).unwrap();
     Ok::<_, ndarray::ShapeError>(a.reversed_axes()).unwrap()
 }
@@ -288,7 +293,11 @@ pub fn sample_goe_faer(n: usize) -> Mat<f64> {
 /// n × n symmetric random matrix
 pub fn sample_goe(n: usize) -> Array2<f64> {
     let m = sample_goe_faer(n);
-    let data: Vec<f64> = m.as_ref().col_iter().flat_map(|col| col.iter().copied()).collect();
+    let data: Vec<f64> = m
+        .as_ref()
+        .col_iter()
+        .flat_map(|col| col.iter().copied())
+        .collect();
     let a = Array2::from_shape_vec((n, n), data).unwrap();
     Ok::<_, ndarray::ShapeError>(a.reversed_axes()).unwrap()
 }
@@ -331,10 +340,7 @@ pub fn level_spacing_ratios(eigenvalues: &[f64]) -> Vec<f64> {
 /// Poisson (uncorrelated): ~0.3863
 pub fn mean_spacing_ratio(eigenvalues: &[f64]) -> f64 {
     let ratios = level_spacing_ratios(eigenvalues);
-    if ratios.is_empty() {
-        return 0.0;
-    }
-    ratios.iter().sum::<f64>() / ratios.len() as f64
+    stats::mean(&ratios).unwrap_or(0.0)
 }
 
 /// Empirical spectral density via histogram.
