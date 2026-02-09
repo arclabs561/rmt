@@ -86,7 +86,6 @@
 use faer::{Mat, Parallelism};
 use ndarray::Array2;
 use rand_distr::{Distribution, Normal};
-use statskit::stats;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -244,7 +243,7 @@ pub fn sample_wishart(n: usize, p: usize) -> Array2<f64> {
         .flat_map(|col| col.iter().copied())
         .collect();
     let a = Array2::from_shape_vec((p, p), data).unwrap();
-    Ok::<_, ndarray::ShapeError>(a.reversed_axes()).unwrap()
+    a.reversed_axes()
 }
 
 /// Sample a GOE (Gaussian Orthogonal Ensemble) matrix.
@@ -299,7 +298,7 @@ pub fn sample_goe(n: usize) -> Array2<f64> {
         .flat_map(|col| col.iter().copied())
         .collect();
     let a = Array2::from_shape_vec((n, n), data).unwrap();
-    Ok::<_, ndarray::ShapeError>(a.reversed_axes()).unwrap()
+    a.reversed_axes()
 }
 
 /// Level spacing ratio for eigenvalue sequence.
@@ -340,7 +339,11 @@ pub fn level_spacing_ratios(eigenvalues: &[f64]) -> Vec<f64> {
 /// Poisson (uncorrelated): ~0.3863
 pub fn mean_spacing_ratio(eigenvalues: &[f64]) -> f64 {
     let ratios = level_spacing_ratios(eigenvalues);
-    stats::mean(&ratios).unwrap_or(0.0)
+    if ratios.is_empty() {
+        0.0
+    } else {
+        ratios.iter().sum::<f64>() / (ratios.len() as f64)
+    }
 }
 
 /// Empirical spectral density via histogram.
