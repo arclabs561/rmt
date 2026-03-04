@@ -1,5 +1,9 @@
 # rmt
 
+[![crates.io](https://img.shields.io/crates/v/rmt.svg)](https://crates.io/crates/rmt)
+[![Documentation](https://docs.rs/rmt/badge.svg)](https://docs.rs/rmt)
+[![CI](https://github.com/arclabs561/rmt/actions/workflows/ci.yml/badge.svg)](https://github.com/arclabs561/rmt/actions/workflows/ci.yml)
+
 Random Matrix Theory primitives for spectral analysis and signal detection.
 Implements Marchenko-Pastur law, Wigner semicircle law, and eigenvalue spacing statistics.
 
