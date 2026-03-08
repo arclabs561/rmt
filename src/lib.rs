@@ -12,9 +12,9 @@
 //!
 //! | Distribution | Matrix Type | Density |
 //! |--------------|-------------|---------|
-//! | [`marchenko_pastur`] | Wishart (X^T X) | Bounded support |
-//! | [`wigner_semicircle`] | Symmetric random | Semicircle |
-//! | Tracy–Widom (edge; not implemented here) | Largest eigenvalue | Skewed |
+//! | [`marchenko_pastur_density`] | Wishart (X^T X) | Bounded support |
+//! | [`wigner_semicircle_density`] | Symmetric random | Semicircle |
+//! | Tracy--Widom (edge; not implemented here) | Largest eigenvalue | Skewed |
 //!
 //! ## Quick Start
 //!
@@ -44,15 +44,15 @@
 //! ## The Marchenko-Pastur Law
 //!
 //! For a matrix X (n samples, p features), the eigenvalues of X^T X / n
-//! cluster in [λ_-, λ_+] where:
+//! cluster in [lambda_-, lambda_+] where:
 //!
 //! ```text
-//! λ_± = σ² (1 ± √(p/n))²
+//! lambda_+/- = sigma^2 (1 +/- sqrt(p/n))^2
 //!
-//! Density: ρ(λ) = (1/(2πσ²)) × √((λ_+ - λ)(λ - λ_-)) / (γλ)
+//! Density: rho(lambda) = (1/(2*pi*sigma^2)) * sqrt((lambda_+ - lambda)(lambda - lambda_-)) / (gamma*lambda)
 //! ```
 //!
-//! When p/n → 0, this converges to a point mass at σ² (classical regime).
+//! When p/n -> 0, this converges to a point mass at sigma^2 (classical regime).
 //! When p/n > 0, eigenvalues spread (high-dimensional regime).
 //!
 //! ## The Wigner Semicircle
@@ -60,21 +60,15 @@
 //! For a symmetric matrix with i.i.d. entries, eigenvalues follow:
 //!
 //! ```text
-//! ρ(λ) = (1/(2πσ²)) × √(4σ² - λ²)  for |λ| ≤ 2σ
+//! rho(lambda) = (1/(2*pi*sigma^2)) * sqrt(4*sigma^2 - lambda^2)  for |lambda| <= 2*sigma
 //! ```
-//!
-//! ## Connections
-//!
-//! - [`wass`](../wass): Wishart matrices → covariance → transport costs
-//! - [`lapl`](../lapl): Graph Laplacian eigenvalues follow RMT under random graphs
-//! - [`rkhs`](../rkhs): Kernel matrix eigenspectra for kernel PCA
 //!
 //! ## What Can Go Wrong
 //!
 //! 1. **Finite size effects**: MP/semicircle are asymptotic. Small n deviates.
 //! 2. **Not centered**: MP assumes zero-mean data. Center your features.
 //! 3. **Correlated features**: MP assumes independence. Correlated data has different spectrum.
-//! 4. **Ratio out of range**: MP needs p/n ∈ (0, ∞). Tracy-Widom for edge.
+//! 4. **Ratio out of range**: MP needs p/n in (0, infinity). Tracy-Widom for edge.
 //! 5. **Numerical eigendecomposition**: For large matrices, use iterative methods.
 //!
 //! ## References
@@ -83,40 +77,25 @@
 //! - Wigner (1955). "Characteristic vectors of bordered matrices with infinite dimensions"
 //! - Johnstone (2001). "On the distribution of the largest eigenvalue in PCA"
 
-use faer::{Mat, Parallelism};
+use std::f64::consts::PI;
+
 use ndarray::Array2;
+use rand::Rng;
 use rand_distr::{Distribution, Normal};
-use thiserror::Error;
 
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("invalid ratio: {0} (must be in (0, 1])")]
-    InvalidRatio(f64),
-
-    #[error("dimension mismatch: {0} vs {1}")]
-    DimensionMismatch(usize, usize),
-
-    #[error("eigenvalue {0} outside support [{1}, {2}]")]
-    OutsideSupport(f64, f64, f64),
-}
-
-pub type Result<T> = std::result::Result<T, Error>;
-
-const PI: f64 = std::f64::consts::PI;
-
-/// Marchenko-Pastur density at point λ.
+/// Marchenko-Pastur density at point lambda.
 ///
-/// For the eigenvalues of (1/n) X^T X where X is n × p with i.i.d. N(0, σ²) entries.
+/// For the eigenvalues of (1/n) X^T X where X is n x p with i.i.d. N(0, sigma^2) entries.
 ///
 /// # Arguments
 ///
 /// * `lambda` - Eigenvalue to evaluate density at
-/// * `ratio` - γ = p/n (must be in (0, 1] for standard form)
+/// * `ratio` - gamma = p/n ratio (any positive value; values > 1 are folded via min(gamma, 1/gamma))
 /// * `sigma_sq` - Variance of matrix entries (default 1.0)
 ///
 /// # Returns
 ///
-/// Density ρ(λ), or 0 if outside support [λ_-, λ_+]
+/// Density rho(lambda), or 0 if outside support [lambda_-, lambda_+]
 ///
 /// # Example
 ///
@@ -144,16 +123,16 @@ pub fn marchenko_pastur_density(lambda: f64, ratio: f64, sigma_sq: f64) -> f64 {
     sqrt_term / (2.0 * PI * sigma_sq * gamma * lambda)
 }
 
-/// Marchenko-Pastur support bounds [λ_-, λ_+].
+/// Marchenko-Pastur support bounds [lambda_-, lambda_+].
 ///
 /// # Arguments
 ///
-/// * `ratio` - γ = p/n
+/// * `ratio` - gamma = p/n ratio (any positive value; values > 1 are folded via min(gamma, 1/gamma))
 /// * `sigma_sq` - Variance of matrix entries
 ///
 /// # Returns
 ///
-/// (λ_minus, λ_plus)
+/// (lambda_minus, lambda_plus)
 pub fn marchenko_pastur_support(ratio: f64, sigma_sq: f64) -> (f64, f64) {
     let gamma = ratio.min(1.0 / ratio);
     let lambda_plus = sigma_sq * (1.0 + gamma.sqrt()).powi(2);
@@ -161,18 +140,18 @@ pub fn marchenko_pastur_support(ratio: f64, sigma_sq: f64) -> (f64, f64) {
     (lambda_minus, lambda_plus)
 }
 
-/// Wigner semicircle density at point λ.
+/// Wigner semicircle density at point lambda.
 ///
-/// For eigenvalues of symmetric matrix with i.i.d. entries of variance σ².
+/// For eigenvalues of symmetric matrix with i.i.d. entries of variance sigma^2.
 ///
 /// # Arguments
 ///
 /// * `lambda` - Eigenvalue to evaluate density at
-/// * `sigma` - Standard deviation (radius = 2σ)
+/// * `sigma` - Standard deviation (radius = 2*sigma)
 ///
 /// # Returns
 ///
-/// Density ρ(λ), or 0 if |λ| > 2σ
+/// Density rho(lambda), or 0 if |lambda| > 2*sigma
 ///
 /// # Example
 ///
@@ -181,7 +160,7 @@ pub fn marchenko_pastur_support(ratio: f64, sigma_sq: f64) -> (f64, f64) {
 ///
 /// // At lambda=0 with sigma=1, R=2, density = 2/(pi*R^2) * R = 1/pi
 /// let density = wigner_semicircle_density(0.0, 1.0);
-/// assert!(density > 0.3);  // Should be ~1/pi ≈ 0.318
+/// assert!(density > 0.3);  // Should be ~1/pi ~ 0.318
 /// ```
 pub fn wigner_semicircle_density(lambda: f64, sigma: f64) -> f64 {
     let r = 2.0 * sigma;
@@ -192,38 +171,33 @@ pub fn wigner_semicircle_density(lambda: f64, sigma: f64) -> f64 {
     (2.0 / (PI * r * r)) * (r * r - lambda * lambda).sqrt()
 }
 
-/// Sample a Wishart matrix: W = X^T X where X is n × p Gaussian.
+/// Sample a Wishart matrix W = X^T X where X is n x p Gaussian, using the
+/// provided RNG for reproducibility.
 ///
-/// This version uses `faer` for matrix multiplication for better performance on large matrices.
-pub fn sample_wishart_faer(n: usize, p: usize) -> Mat<f64> {
-    let mut rng = rand::rng();
+/// # Arguments
+///
+/// * `rng` - Random number generator
+/// * `n` - Number of samples (rows of X)
+/// * `p` - Number of features (columns of X)
+///
+/// # Returns
+///
+/// p x p Wishart matrix
+pub fn sample_wishart_with<R: Rng>(rng: &mut R, n: usize, p: usize) -> Array2<f64> {
     let normal = Normal::new(0.0, 1.0).expect("Normal(0, 1) should be valid");
-
-    // X: n × p
-    let mut x = Mat::<f64>::zeros(n, p);
+    let mut x = Array2::zeros((n, p));
     for i in 0..n {
         for j in 0..p {
-            x[(i, j)] = normal.sample(&mut rng);
+            x[[i, j]] = normal.sample(rng);
         }
     }
-
-    // W = X^T X
-    let mut w = Mat::<f64>::zeros(p, p);
-    faer::linalg::matmul::matmul(
-        w.as_mut(),
-        x.transpose(),
-        x.as_ref(),
-        None,
-        1.0,
-        Parallelism::Rayon(0),
-    );
-    w
+    x.t().dot(&x)
 }
 
-/// Sample a Wishart matrix: W = X^T X where X is n × p Gaussian.
+/// Sample a Wishart matrix: W = X^T X where X is n x p Gaussian.
 ///
 /// The eigenvalues of W/n follow the Marchenko-Pastur distribution
-/// as n, p → ∞ with p/n → γ.
+/// as n, p -> infinity with p/n -> gamma.
 ///
 /// # Arguments
 ///
@@ -232,50 +206,39 @@ pub fn sample_wishart_faer(n: usize, p: usize) -> Mat<f64> {
 ///
 /// # Returns
 ///
-/// p × p Wishart matrix
+/// p x p Wishart matrix
 pub fn sample_wishart(n: usize, p: usize) -> Array2<f64> {
-    let w = sample_wishart_faer(n, p);
-
-    // Convert back to ndarray for compatibility with existing tests/APIs
-    let data: Vec<f64> = w
-        .as_ref()
-        .col_iter()
-        .flat_map(|col| col.iter().copied())
-        .collect();
-    let a = Array2::from_shape_vec((p, p), data).unwrap();
-    a.reversed_axes()
+    sample_wishart_with(&mut rand::rng(), n, p)
 }
 
-/// Sample a GOE (Gaussian Orthogonal Ensemble) matrix.
+/// Sample a GOE (Gaussian Orthogonal Ensemble) matrix using the provided RNG
+/// for reproducibility.
 ///
 /// Symmetric matrix with Gaussian entries. Eigenvalues follow Wigner semicircle.
-pub fn sample_goe_faer(n: usize) -> Mat<f64> {
-    let mut rng = rand::rng();
+///
+/// # Arguments
+///
+/// * `rng` - Random number generator
+/// * `n` - Matrix dimension
+///
+/// # Returns
+///
+/// n x n symmetric random matrix
+pub fn sample_goe_with<R: Rng>(rng: &mut R, n: usize) -> Array2<f64> {
     let normal = Normal::new(0.0, 1.0).expect("Normal(0, 1) should be valid");
-
-    let mut m = Mat::<f64>::zeros(n, n);
-
-    // Diagonal: N(0, 2)
+    let mut m = Array2::zeros((n, n));
     for i in 0..n {
-        m[(i, i)] = normal.sample(&mut rng) * 2.0_f64.sqrt();
+        m[[i, i]] = normal.sample(rng) * 2.0_f64.sqrt();
     }
-
-    // Off-diagonal: N(0, 1), symmetric
     for i in 0..n {
         for j in (i + 1)..n {
-            let val = normal.sample(&mut rng);
-            m[(i, j)] = val;
-            m[(j, i)] = val;
+            let val = normal.sample(rng);
+            m[[i, j]] = val;
+            m[[j, i]] = val;
         }
     }
-
-    // Normalize by sqrt(n) for standard semicircle
     let scale = 1.0 / (n as f64).sqrt();
-    for i in 0..n {
-        for j in 0..n {
-            m[(i, j)] *= scale;
-        }
-    }
+    m *= scale;
     m
 }
 
@@ -289,22 +252,15 @@ pub fn sample_goe_faer(n: usize) -> Mat<f64> {
 ///
 /// # Returns
 ///
-/// n × n symmetric random matrix
+/// n x n symmetric random matrix
 pub fn sample_goe(n: usize) -> Array2<f64> {
-    let m = sample_goe_faer(n);
-    let data: Vec<f64> = m
-        .as_ref()
-        .col_iter()
-        .flat_map(|col| col.iter().copied())
-        .collect();
-    let a = Array2::from_shape_vec((n, n), data).unwrap();
-    a.reversed_axes()
+    sample_goe_with(&mut rand::rng(), n)
 }
 
 /// Level spacing ratio for eigenvalue sequence.
 ///
-/// The ratio r_i = min(s_i, s_{i+1}) / max(s_i, s_{i+1}) where s_i = λ_{i+1} - λ_i.
-/// For GOE: mean ≈ 0.5307. For Poisson (uncorrelated): mean ≈ 0.3863.
+/// The ratio r_i = min(s_i, s_{i+1}) / max(s_i, s_{i+1}) where s_i = lambda_{i+1} - lambda_i.
+/// For GOE: mean ~ 0.5307. For Poisson (uncorrelated): mean ~ 0.3863.
 ///
 /// # Arguments
 ///
@@ -389,7 +345,7 @@ pub fn empirical_spectral_density(eigenvalues: &[f64], bins: usize) -> (Vec<f64>
     (centers, densities)
 }
 
-/// Stieltjes transform: m(z) = (1/n) Σ 1/(λ_i - z)
+/// Stieltjes transform: m(z) = (1/n) sum 1/(lambda_i - z)
 ///
 /// The Stieltjes transform encodes the spectral distribution and is
 /// central to proving limiting theorems in RMT.
@@ -446,7 +402,6 @@ mod tests {
     #[test]
     fn test_wigner_at_zero() {
         let density = wigner_semicircle_density(0.0, 1.0);
-        // At λ=0: ρ(0) = 2/(πR²) × R = 2/(πR) = 1/π for R=2
         let expected = 1.0 / PI;
         assert!(
             (density - expected).abs() < 0.01,
@@ -463,6 +418,16 @@ mod tests {
     }
 
     #[test]
+    fn test_wishart_seeded_deterministic() {
+        use rand::SeedableRng;
+        let mut rng1 = rand::rngs::SmallRng::seed_from_u64(42);
+        let mut rng2 = rand::rngs::SmallRng::seed_from_u64(42);
+        let w1 = sample_wishart_with(&mut rng1, 20, 10);
+        let w2 = sample_wishart_with(&mut rng2, 20, 10);
+        assert_eq!(w1, w2);
+    }
+
+    #[test]
     fn test_goe_symmetric() {
         let goe = sample_goe(10);
         for i in 0..10 {
@@ -473,6 +438,16 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn test_goe_seeded_deterministic() {
+        use rand::SeedableRng;
+        let mut rng1 = rand::rngs::SmallRng::seed_from_u64(99);
+        let mut rng2 = rand::rngs::SmallRng::seed_from_u64(99);
+        let g1 = sample_goe_with(&mut rng1, 15);
+        let g2 = sample_goe_with(&mut rng2, 15);
+        assert_eq!(g1, g2);
     }
 
     #[test]

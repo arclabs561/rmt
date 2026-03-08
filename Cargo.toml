@@ -12,11 +12,6 @@ keywords = ["random-matrix", "eigenvalue", "marchenko-pastur", "wigner", "statis
 categories = ["algorithms", "science", "mathematics"]
 
 [dependencies]
-thiserror = "2.0"
 ndarray = "0.16"
 rand = "0.9"
 rand_distr = "0.5"
-faer = "0.19"
-
-[dev-dependencies]
-proptest = "1.5"
