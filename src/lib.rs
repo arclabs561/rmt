@@ -354,6 +354,59 @@ pub fn stieltjes_transform(eigenvalues: &[f64], z: f64) -> f64 {
     eigenvalues.iter().map(|&ev| 1.0 / (ev - z)).sum::<f64>() / n
 }
 
+/// Estimate effective dimensionality of an embedding matrix using the Marchenko-Pastur law.
+///
+/// Given eigenvalues of the sample covariance matrix (X^T X / n), counts how many
+/// exceed the upper edge of the Marchenko-Pastur bulk (lambda_+). Eigenvalues above
+/// this threshold are signal; those below are noise.
+///
+/// This is the standard RMT approach to PCA dimensionality selection: instead of
+/// choosing an arbitrary variance-explained cutoff, use the theoretically-derived
+/// noise boundary.
+///
+/// # Arguments
+///
+/// * `eigenvalues` - Eigenvalues of the sample covariance matrix, in any order
+/// * `n_samples` - Number of samples used to compute the covariance
+/// * `n_features` - Number of features (dimensionality of the data)
+///
+/// # Returns
+///
+/// Number of eigenvalues exceeding the MP upper edge (signal dimensions)
+///
+/// # Example
+///
+/// ```rust
+/// use rmt::effective_dimension;
+///
+/// // 5 signal eigenvalues + 95 noise eigenvalues
+/// let mut eigenvalues = vec![10.0, 8.0, 6.0, 4.0, 2.5];
+/// eigenvalues.extend(vec![1.0; 95]); // noise floor
+/// let dim = effective_dimension(&eigenvalues, 200, 100);
+/// assert!(dim >= 4 && dim <= 6, "got {dim}");
+/// ```
+pub fn effective_dimension(eigenvalues: &[f64], n_samples: usize, n_features: usize) -> usize {
+    if eigenvalues.is_empty() || n_samples == 0 || n_features == 0 {
+        return 0;
+    }
+
+    let ratio = n_features as f64 / n_samples as f64;
+
+    // Estimate noise variance as the median eigenvalue (robust to outliers).
+    // For pure noise, eigenvalues cluster around sigma^2.
+    let mut sorted: Vec<f64> = eigenvalues.to_vec();
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let median = sorted[sorted.len() / 2];
+
+    // sigma^2 estimate: under MP, the median of noise eigenvalues ≈ sigma^2
+    // for moderate ratios. Use a slightly more conservative estimate.
+    let sigma_sq = median.max(1e-12);
+
+    let (_, lambda_plus) = marchenko_pastur_support(ratio, sigma_sq);
+
+    eigenvalues.iter().filter(|&&ev| ev > lambda_plus).count()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -448,6 +501,28 @@ mod tests {
         let g1 = sample_goe_with(&mut rng1, 15);
         let g2 = sample_goe_with(&mut rng2, 15);
         assert_eq!(g1, g2);
+    }
+
+    #[test]
+    fn test_effective_dimension_with_signal() {
+        // Create eigenvalues with clear signal: 5 large + 95 noise
+        let mut eigenvalues = vec![10.0, 8.0, 6.0, 4.0, 3.0];
+        eigenvalues.extend(vec![1.0; 95]);
+        let dim = effective_dimension(&eigenvalues, 200, 100);
+        assert!(dim >= 4 && dim <= 6, "expected 4-6 signal dims, got {dim}");
+    }
+
+    #[test]
+    fn test_effective_dimension_pure_noise() {
+        // All eigenvalues are noise (clustered around 1.0)
+        let eigenvalues = vec![1.0; 50];
+        let dim = effective_dimension(&eigenvalues, 200, 50);
+        assert_eq!(dim, 0, "pure noise should have 0 effective dims");
+    }
+
+    #[test]
+    fn test_effective_dimension_empty() {
+        assert_eq!(effective_dimension(&[], 100, 50), 0);
     }
 
     #[test]
