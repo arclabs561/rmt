@@ -552,3 +552,64 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn effective_dimension_bounded(
+            n_signal in 1_usize..10,
+            n_noise in 10_usize..100,
+        ) {
+            let mut eigenvalues: Vec<f64> = (0..n_signal).map(|i| 10.0 + i as f64).collect();
+            eigenvalues.extend(vec![1.0; n_noise]);
+            let n_features = eigenvalues.len();
+            let n_samples = n_features * 2;
+            let dim = effective_dimension(&eigenvalues, n_samples, n_features);
+            prop_assert!(dim <= n_features, "dim {} > n_features {}", dim, n_features);
+        }
+
+        #[test]
+        fn mp_density_nonnegative(
+            lambda in 0.01_f64..20.0,
+            ratio in 0.1_f64..5.0,
+        ) {
+            let d = marchenko_pastur_density(lambda, ratio, 1.0);
+            prop_assert!(d >= 0.0, "MP density negative: {}", d);
+        }
+
+        #[test]
+        fn mp_density_zero_outside_support(
+            ratio in 0.1_f64..5.0,
+        ) {
+            let (lo, hi) = marchenko_pastur_support(ratio, 1.0);
+            let below = marchenko_pastur_density(lo - 1.0, ratio, 1.0);
+            let above = marchenko_pastur_density(hi + 1.0, ratio, 1.0);
+            prop_assert!((below - 0.0).abs() < 1e-10, "nonzero below support: {}", below);
+            prop_assert!((above - 0.0).abs() < 1e-10, "nonzero above support: {}", above);
+        }
+
+        #[test]
+        fn wigner_density_nonnegative(
+            lambda in -5.0_f64..5.0,
+            sigma in 0.1_f64..3.0,
+        ) {
+            let d = wigner_semicircle_density(lambda, sigma);
+            prop_assert!(d >= 0.0, "Wigner density negative: {}", d);
+        }
+
+        #[test]
+        fn spacing_ratios_in_unit_interval(
+            n in 5_usize..20,
+        ) {
+            let eigenvalues: Vec<f64> = (0..n).map(|i| i as f64 * 0.5 + 0.1).collect();
+            let ratios = level_spacing_ratios(&eigenvalues);
+            for &r in &ratios {
+                prop_assert!(r >= 0.0 && r <= 1.0, "ratio {} outside [0,1]", r);
+            }
+        }
+    }
+}

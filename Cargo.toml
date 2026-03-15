@@ -15,3 +15,6 @@ categories = ["algorithms", "science", "mathematics"]
 ndarray = "0.16"
 rand = "0.9"
 rand_distr = "0.5"
+
+[dev-dependencies]
+proptest = "1.9"
