@@ -4,8 +4,7 @@
 [![Documentation](https://docs.rs/rmt/badge.svg)](https://docs.rs/rmt)
 [![CI](https://github.com/arclabs561/rmt/actions/workflows/ci.yml/badge.svg)](https://github.com/arclabs561/rmt/actions/workflows/ci.yml)
 
-Random Matrix Theory primitives for spectral analysis and signal detection.
-Implements Marchenko-Pastur law, Wigner semicircle law, and eigenvalue spacing statistics.
+Random matrix theory primitives.
 
 Dual-licensed under MIT or Apache-2.0.
 
