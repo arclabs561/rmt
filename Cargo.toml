@@ -11,6 +11,8 @@ documentation = "https://docs.rs/rmt"
 keywords = ["random-matrix", "eigenvalue", "marchenko-pastur", "wigner", "statistics"]
 categories = ["algorithms", "science", "mathematics"]
 
+[workspace]
+
 [dependencies]
 ndarray = "0.16"
 rand = "0.9"
