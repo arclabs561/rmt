@@ -509,7 +509,7 @@ mod tests {
         let mut eigenvalues = vec![10.0, 8.0, 6.0, 4.0, 3.0];
         eigenvalues.extend(vec![1.0; 95]);
         let dim = effective_dimension(&eigenvalues, 200, 100);
-        assert!(dim >= 4 && dim <= 6, "expected 4-6 signal dims, got {dim}");
+        assert!((4..=6).contains(&dim), "expected 4-6 signal dims, got {dim}");
     }
 
     #[test]
@@ -608,7 +608,7 @@ mod proptests {
             let eigenvalues: Vec<f64> = (0..n).map(|i| i as f64 * 0.5 + 0.1).collect();
             let ratios = level_spacing_ratios(&eigenvalues);
             for &r in &ratios {
-                prop_assert!(r >= 0.0 && r <= 1.0, "ratio {} outside [0,1]", r);
+                prop_assert!((0.0..=1.0).contains(&r), "ratio {} outside [0,1]", r);
             }
         }
 
