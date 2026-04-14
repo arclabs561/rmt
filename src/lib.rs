@@ -509,7 +509,10 @@ mod tests {
         let mut eigenvalues = vec![10.0, 8.0, 6.0, 4.0, 3.0];
         eigenvalues.extend(vec![1.0; 95]);
         let dim = effective_dimension(&eigenvalues, 200, 100);
-        assert!((4..=6).contains(&dim), "expected 4-6 signal dims, got {dim}");
+        assert!(
+            (4..=6).contains(&dim),
+            "expected 4-6 signal dims, got {dim}"
+        );
     }
 
     #[test]
