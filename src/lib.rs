@@ -611,5 +611,84 @@ mod proptests {
                 prop_assert!(r >= 0.0 && r <= 1.0, "ratio {} outside [0,1]", r);
             }
         }
+
+        #[test]
+        fn mp_density_nonnegative_within_support(
+            gamma in 0.1_f64..10.0,
+            sigma_sq in 0.01_f64..10.0,
+            // 20 evenly-spaced fractions across [0, 1] encoded as integer steps
+            step in 0_u32..20,
+        ) {
+            let (lo, hi) = marchenko_pastur_support(gamma, sigma_sq);
+            // sample the interior to avoid numerical edge effects at endpoints
+            let t = (step as f64 + 0.5) / 20.0;
+            let lambda = lo + t * (hi - lo);
+            let d = marchenko_pastur_density(lambda, gamma, sigma_sq);
+            prop_assert!(d >= 0.0, "MP density negative {} at lambda={} gamma={} sigma_sq={}", d, lambda, gamma, sigma_sq);
+        }
+
+        #[test]
+        fn mp_support_ordering(
+            gamma in 0.1_f64..10.0,
+            sigma_sq in 0.01_f64..10.0,
+        ) {
+            let (lo, hi) = marchenko_pastur_support(gamma, sigma_sq);
+            prop_assert!(lo < hi, "lambda_minus {} >= lambda_plus {} for gamma={} sigma_sq={}", lo, hi, gamma, sigma_sq);
+        }
+
+        #[test]
+        fn wigner_symmetry(
+            sigma in 0.01_f64..10.0,
+            // x encoded as fraction of radius, avoiding the exact boundary
+            frac in 0.0_f64..1.0,
+        ) {
+            let r = 2.0 * sigma;
+            let x = frac * r * 0.999; // strictly inside support
+            let d_pos = wigner_semicircle_density(x, sigma);
+            let d_neg = wigner_semicircle_density(-x, sigma);
+            prop_assert!(
+                (d_pos - d_neg).abs() < 1e-12,
+                "Wigner density not symmetric: density({})={} density({})={}",
+                x, d_pos, -x, d_neg
+            );
+        }
+
+        #[test]
+        fn level_spacing_mean_finite_positive(
+            // Use a small fixed-size sorted sequence with distinct spacings
+            seed in 0_u64..1000,
+            n in 5_usize..30,
+        ) {
+            use rand::SeedableRng;
+            use rand_distr::Distribution;
+            // Build a sorted eigenvalue sequence from positive spacings
+            let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
+            let exp = rand_distr::Exp::new(1.0_f64).unwrap();
+            let mut eigenvalues = vec![0.0_f64];
+            for _ in 0..n {
+                eigenvalues.push(eigenvalues.last().unwrap() + exp.sample(&mut rng) + 1e-6);
+            }
+            let ratios = level_spacing_ratios(&eigenvalues);
+            for &r in &ratios {
+                prop_assert!(r > 0.0 && r.is_finite(), "ratio {} not in (0, inf)", r);
+            }
+            let mean = mean_spacing_ratio(&eigenvalues);
+            prop_assert!(mean > 0.0 && mean.is_finite(), "mean ratio {} not finite positive", mean);
+        }
+
+        #[test]
+        fn effective_dimension_bounds(
+            n_signal in 0_usize..10,
+            n_noise in 1_usize..50,
+        ) {
+            let mut eigenvalues: Vec<f64> = (0..n_signal).map(|i| 100.0 + i as f64).collect();
+            eigenvalues.extend(vec![1.0; n_noise]);
+            let n_features = eigenvalues.len();
+            let n_samples = n_features * 4;
+            let dim = effective_dimension(&eigenvalues, n_samples, n_features);
+            prop_assert!(dim <= n_features, "dim {} > n_features {}", dim, n_features);
+            // dim is usize so >= 0 by construction; verify it doesn't exceed input count
+            prop_assert!(dim <= eigenvalues.len());
+        }
     }
 }
