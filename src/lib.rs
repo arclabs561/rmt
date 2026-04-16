@@ -374,7 +374,9 @@ pub fn stieltjes_transform(eigenvalues: &[f64], z: f64) -> f64 {
 ///
 /// Number of eigenvalues exceeding the MP upper edge (signal dimensions)
 ///
-/// # Example
+/// # Examples
+///
+/// Basic usage with synthetic eigenvalues:
 ///
 /// ```rust
 /// use rmt::effective_dimension;
@@ -384,6 +386,31 @@ pub fn stieltjes_transform(eigenvalues: &[f64], z: f64) -> f64 {
 /// eigenvalues.extend(vec![1.0; 95]); // noise floor
 /// let dim = effective_dimension(&eigenvalues, 200, 100);
 /// assert!(dim >= 4 && dim <= 6, "got {dim}");
+/// ```
+///
+/// PCA dimensionality selection — choosing how many components to keep without
+/// an arbitrary variance-explained threshold:
+///
+/// ```rust
+/// use rmt::{effective_dimension, marchenko_pastur_support};
+///
+/// // After PCA on a (n=200, p=50) data matrix, you have eigenvalues of X^T X / n.
+/// // Which eigenvalues represent real signal vs sampling noise?
+/// let (n, p) = (200_usize, 50_usize);
+/// let gamma = p as f64 / n as f64;  // aspect ratio = 0.25
+///
+/// // Eigenvalues sorted descending (typical PCA output).
+/// // First 5 are well above noise; the rest cluster near 1.0.
+/// let mut eigenvalues = vec![12.0, 9.5, 7.0, 4.5, 2.8];
+/// eigenvalues.extend(vec![1.0; 45]);
+///
+/// // The MP upper edge gives the theoretical noise ceiling.
+/// let (_, lambda_plus) = marchenko_pastur_support(gamma, 1.0);
+///
+/// // effective_dimension counts eigenvalues above that ceiling.
+/// let signal_dims = effective_dimension(&eigenvalues, n, p);
+/// // signal_dims == 5: keep 5 PCA components, discard the rest as noise.
+/// assert!(signal_dims >= 4 && signal_dims <= 6, "got {signal_dims}");
 /// ```
 pub fn effective_dimension(eigenvalues: &[f64], n_samples: usize, n_features: usize) -> usize {
     if eigenvalues.is_empty() || n_samples == 0 || n_features == 0 {
