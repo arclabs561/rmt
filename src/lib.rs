@@ -1,3 +1,4 @@
+#![warn(missing_docs)]
 //! # rmt
 //!
 //! Random Matrix Theory: eigenvalue distributions and spectral statistics.
