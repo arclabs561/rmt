@@ -14,6 +14,7 @@
 //! ```sh
 //! cargo run --release --example spectral_validation
 //! ```
+#![allow(clippy::needless_range_loop)] // Jacobi rotations index by (p,q,k) inherently
 
 use std::process::ExitCode;
 
