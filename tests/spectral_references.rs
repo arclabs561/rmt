@@ -17,7 +17,9 @@ use rmt::{
 /// Eigenvalues of a symmetric matrix via cyclic Jacobi rotations (ascending).
 fn jacobi_eigenvalues(mat: &Array2<f64>) -> Vec<f64> {
     let n = mat.nrows();
-    let mut a: Vec<Vec<f64>> = (0..n).map(|i| (0..n).map(|j| mat[[i, j]]).collect()).collect();
+    let mut a: Vec<Vec<f64>> = (0..n)
+        .map(|i| (0..n).map(|j| mat[[i, j]]).collect())
+        .collect();
     for _ in 0..100 {
         let mut off = 0.0;
         for p in 0..n {
@@ -117,9 +119,18 @@ fn wishart_spectrum_within_mp_support() {
     let mut rng = StdRng::seed_from_u64(0x1234);
     let (n, p) = (600, 150);
     let w = sample_wishart_with(&mut rng, n, p);
-    let ev: Vec<f64> = jacobi_eigenvalues(&w).into_iter().map(|v| v / n as f64).collect();
+    let ev: Vec<f64> = jacobi_eigenvalues(&w)
+        .into_iter()
+        .map(|v| v / n as f64)
+        .collect();
     let (lo, hi) = marchenko_pastur_support(p as f64 / n as f64, 1.0);
-    let inside = ev.iter().filter(|&&v| v >= lo - 0.05 && v <= hi + 0.05).count();
+    let inside = ev
+        .iter()
+        .filter(|&&v| v >= lo - 0.05 && v <= hi + 0.05)
+        .count();
     let frac = inside as f64 / ev.len() as f64;
-    assert!(frac > 0.95, "Wishart W/n spectrum {frac:.3} inside MP support, want >0.95");
+    assert!(
+        frac > 0.95,
+        "Wishart W/n spectrum {frac:.3} inside MP support, want >0.95"
+    );
 }
