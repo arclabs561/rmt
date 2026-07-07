@@ -2,21 +2,10 @@
 
 [![crates.io](https://img.shields.io/crates/v/rmt.svg)](https://crates.io/crates/rmt)
 [![Documentation](https://docs.rs/rmt/badge.svg)](https://docs.rs/rmt)
-[![CI](https://github.com/arclabs561/rmt/actions/workflows/ci.yml/badge.svg)](https://github.com/arclabs561/rmt/actions/workflows/ci.yml)
 
 Random matrix theory primitives.
 
-Closed-form eigenvalue laws (Marchenko-Pastur for sample covariance, Wigner
-semicircle for symmetric matrices) plus diagnostics that run on an eigenvalue
-spectrum: signal-vs-noise dimension counting against the Marchenko-Pastur edge,
-level-spacing ratios, empirical spectral histograms, and the Stieltjes
-transform. Samplers for Wishart and Gaussian Orthogonal Ensemble matrices are
-included for generating test spectra. The diagnostics take eigenvalues you have
-already computed; this crate does not do eigendecomposition itself.
-
-Dual-licensed under MIT or Apache-2.0.
-
-[crates.io](https://crates.io/crates/rmt) | [docs.rs](https://docs.rs/rmt)
+`rmt` works with eigenvalue spectra. It does not do eigendecomposition.
 
 ```rust
 use rmt::{marchenko_pastur_density, wigner_semicircle_density, sample_wishart};
