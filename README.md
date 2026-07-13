@@ -44,3 +44,8 @@ recovering signal dimensions from a synthetic spectrum
 - Covariance matrix eigenvalues follow the MP distribution
 - Neural network weight spectra reveal training dynamics
 - Distinguishing signal from noise eigenvalues in PCA
+
+## License
+
+Licensed under either the [Apache License, Version 2.0](LICENSE-APACHE) or
+the [MIT license](LICENSE-MIT), at your option.
