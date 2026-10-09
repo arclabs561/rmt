@@ -42,7 +42,9 @@ recovering signal dimensions from a synthetic spectrum
 ## Why RMT?
 
 - Covariance matrix eigenvalues follow the MP distribution
-- Neural network weight spectra reveal training dynamics
+- Neural network weight spectra reveal training dynamics (Martin & Mahoney 2021,
+  "Implicit Self-Regularization in Deep Neural Networks: Evidence from Random
+  Matrix Theory and Implications for Learning", JMLR 22)
 - Distinguishing signal from noise eigenvalues in PCA
 
 ## License

@@ -82,6 +82,11 @@ use std::f64::consts::PI;
 
 use ndarray::Array2;
 use rand::Rng;
+
+// Compile and run the README's Rust examples as doctests.
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;
 use rand_distr::{Distribution, Normal};
 
 /// Marchenko-Pastur density at point lambda.
@@ -432,7 +437,7 @@ pub fn effective_dimension(eigenvalues: &[f64], n_samples: usize, n_features: us
     // When p > n only the n largest eigenvalues are nonzero; the rest are the
     // atom at 0 and are left out of the median.
     let mut sorted: Vec<f64> = eigenvalues.to_vec();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    sorted.sort_by(|a, b| a.total_cmp(b));
     let rank = n_samples.min(n_features);
     let nonzero = &sorted[sorted.len().saturating_sub(rank)..];
     let median = nonzero[nonzero.len() / 2];

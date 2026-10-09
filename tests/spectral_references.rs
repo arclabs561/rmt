@@ -53,7 +53,7 @@ fn jacobi_eigenvalues(mat: &Array2<f64>) -> Vec<f64> {
         }
     }
     let mut ev: Vec<f64> = (0..n).map(|i| a[i][i]).collect();
-    ev.sort_by(|x, y| x.partial_cmp(y).unwrap());
+    ev.sort_by(|x, y| x.total_cmp(y));
     ev
 }
 
