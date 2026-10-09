@@ -91,12 +91,16 @@ use rand_distr::{Distribution, Normal};
 /// # Arguments
 ///
 /// * `lambda` - Eigenvalue to evaluate density at
-/// * `ratio` - gamma = p/n ratio (any positive value; values > 1 are folded via min(gamma, 1/gamma))
+/// * `ratio` - gamma = p/n ratio (any positive value)
 /// * `sigma_sq` - Variance of matrix entries (default 1.0)
 ///
 /// # Returns
 ///
-/// Density rho(lambda), or 0 if outside support [lambda_-, lambda_+]
+/// Density rho(lambda), or 0 if outside support [lambda_-, lambda_+].
+///
+/// For gamma > 1, X^T X / n has rank n < p, so the law has an atom of mass
+/// 1 - 1/gamma at 0 that this density does not include; the density itself
+/// integrates to 1/gamma over the support.
 ///
 /// # Example
 ///
@@ -112,7 +116,7 @@ pub fn marchenko_pastur_density(lambda: f64, ratio: f64, sigma_sq: f64) -> f64 {
         return 0.0;
     }
 
-    let gamma = ratio.min(1.0 / ratio); // Handle both p/n < 1 and p/n > 1
+    let gamma = ratio;
     let lambda_plus = sigma_sq * (1.0 + gamma.sqrt()).powi(2);
     let lambda_minus = sigma_sq * (1.0 - gamma.sqrt()).powi(2);
 
@@ -128,14 +132,15 @@ pub fn marchenko_pastur_density(lambda: f64, ratio: f64, sigma_sq: f64) -> f64 {
 ///
 /// # Arguments
 ///
-/// * `ratio` - gamma = p/n ratio (any positive value; values > 1 are folded via min(gamma, 1/gamma))
+/// * `ratio` - gamma = p/n ratio (any positive value)
 /// * `sigma_sq` - Variance of matrix entries
 ///
 /// # Returns
 ///
-/// (lambda_minus, lambda_plus)
+/// (lambda_minus, lambda_plus). For gamma > 1 these bound the n nonzero
+/// eigenvalues of X^T X / n; the other p - n eigenvalues are exactly 0.
 pub fn marchenko_pastur_support(ratio: f64, sigma_sq: f64) -> (f64, f64) {
-    let gamma = ratio.min(1.0 / ratio);
+    let gamma = ratio;
     let lambda_plus = sigma_sq * (1.0 + gamma.sqrt()).powi(2);
     let lambda_minus = sigma_sq * (1.0 - gamma.sqrt()).powi(2);
     (lambda_minus, lambda_plus)
@@ -420,19 +425,53 @@ pub fn effective_dimension(eigenvalues: &[f64], n_samples: usize, n_features: us
 
     let ratio = n_features as f64 / n_samples as f64;
 
-    // Estimate noise variance as the median eigenvalue (robust to outliers).
-    // For pure noise, eigenvalues cluster around sigma^2.
+    // Estimate the noise variance by median matching (Gavish & Donoho 2014,
+    // "The Optimal Hard Threshold for Singular Values is 4/sqrt(3)"): the
+    // median noise eigenvalue is sigma^2 times the median of MP(gamma, 1),
+    // which is well below 1 for gamma near 1 (about 0.65 at gamma = 1).
+    // When p > n only the n largest eigenvalues are nonzero; the rest are the
+    // atom at 0 and are left out of the median.
     let mut sorted: Vec<f64> = eigenvalues.to_vec();
     sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    let median = sorted[sorted.len() / 2];
+    let rank = n_samples.min(n_features);
+    let nonzero = &sorted[sorted.len().saturating_sub(rank)..];
+    let median = nonzero[nonzero.len() / 2];
 
-    // sigma^2 estimate: under MP, the median of noise eigenvalues ≈ sigma^2
-    // for moderate ratios. Use a slightly more conservative estimate.
-    let sigma_sq = median.max(1e-12);
+    let sigma_sq = (median / marchenko_pastur_median(ratio)).max(1e-12);
 
     let (_, lambda_plus) = marchenko_pastur_support(ratio, sigma_sq);
 
     eigenvalues.iter().filter(|&&ev| ev > lambda_plus).count()
+}
+
+/// Median of the continuous part of MP(gamma, sigma^2 = 1), normalized to a
+/// probability distribution (for gamma > 1, the median of the nonzero
+/// eigenvalues).
+fn marchenko_pastur_median(gamma: f64) -> f64 {
+    let (a, b) = marchenko_pastur_support(gamma, 1.0);
+    // Integrate under lambda = a + (b - a) sin^2(phi): the Jacobian cancels
+    // the square-root edges and the 1/sqrt(lambda) pole at gamma = 1, so the
+    // integrand is smooth and the midpoint rule converges fast.
+    const STEPS: usize = 4096;
+    let h = std::f64::consts::FRAC_PI_2 / STEPS as f64;
+    let lambda_at = |phi: f64| a + (b - a) * phi.sin().powi(2);
+    let weights: Vec<f64> = (0..STEPS)
+        .map(|i| {
+            let phi = (i as f64 + 0.5) * h;
+            let x = lambda_at(phi);
+            ((b - x) * (x - a)).sqrt() / x * (2.0 * phi).sin()
+        })
+        .collect();
+    let half = 0.5 * weights.iter().sum::<f64>();
+    let mut acc = 0.0;
+    for (i, w) in weights.iter().enumerate() {
+        if acc + w >= half {
+            let t = (half - acc) / w;
+            return lambda_at((i as f64 + t) * h);
+        }
+        acc += w;
+    }
+    b
 }
 
 #[cfg(test)]
@@ -549,6 +588,25 @@ mod tests {
         let eigenvalues = vec![1.0; 50];
         let dim = effective_dimension(&eigenvalues, 200, 50);
         assert_eq!(dim, 0, "pure noise should have 0 effective dims");
+    }
+
+    #[test]
+    fn test_marchenko_pastur_median_reference_values() {
+        // Reference medians from scipy quad + brentq on the MP density;
+        // 0.6528 at gamma = 1 is the mu_beta of Gavish & Donoho (2014).
+        // gamma = 4 is 4 * median(MP(1/4)) by the n <-> p duality.
+        for (gamma, want) in [
+            (0.25, 0.916_004),
+            (0.5, 0.830_466),
+            (1.0, 0.652_776),
+            (4.0, 3.664_016),
+        ] {
+            let got = marchenko_pastur_median(gamma);
+            assert!(
+                (got - want).abs() < 1e-4,
+                "median MP({gamma}) = {got}, want {want}"
+            );
+        }
     }
 
     #[test]
