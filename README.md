@@ -7,6 +7,11 @@ Random matrix theory primitives.
 
 `rmt` works with eigenvalue spectra. It does not do eigendecomposition.
 
+```toml
+[dependencies]
+rmt = "0.1.4"
+```
+
 ```rust
 use rmt::{marchenko_pastur_density, wigner_semicircle_density, sample_wishart};
 
@@ -20,9 +25,19 @@ let density = wigner_semicircle_density(0.5, 1.0);
 let wishart = sample_wishart(100, 50);
 ```
 
-See [`examples/effective_dimension.rs`](examples/effective_dimension.rs) for
-recovering signal dimensions from a synthetic spectrum
-(`cargo run --example effective_dimension`).
+[`examples/effective_dimension.rs`](examples/effective_dimension.rs) plants
+four signal eigenvalues in a synthetic spectrum and recovers them against the
+Marchenko-Pastur edge:
+
+```sh
+cargo run --example effective_dimension
+```
+
+```text
+p/n ratio (gamma):        0.250
+MP noise support:         [0.250, 2.250]
+eigenvalues above edge:   4 (planted 4)
+```
 
 ## Functions
 
@@ -38,14 +53,6 @@ recovering signal dimensions from a synthetic spectrum
 | `stieltjes_transform` | `m(z) = (1/n) sum 1/(lambda_i - z)` |
 | `sample_wishart`, `sample_wishart_with` | Sample `X^T X` (latter takes an RNG) |
 | `sample_goe`, `sample_goe_with` | Sample a GOE matrix (latter takes an RNG) |
-
-## Why RMT?
-
-- Covariance matrix eigenvalues follow the MP distribution
-- Neural network weight spectra reveal training dynamics (Martin & Mahoney 2021,
-  "Implicit Self-Regularization in Deep Neural Networks: Evidence from Random
-  Matrix Theory and Implications for Learning", JMLR 22)
-- Distinguishing signal from noise eigenvalues in PCA
 
 ## License
 
