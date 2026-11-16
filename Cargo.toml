@@ -25,7 +25,7 @@ categories = ["algorithms", "science", "mathematics"]
 [dependencies]
 ndarray = "0.16"
 rand = "0.9"
-rand_distr = "0.5"
+rand_distr = "0.6"
 
 [dev-dependencies]
 proptest = "1.9"
