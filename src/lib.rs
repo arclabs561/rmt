@@ -271,6 +271,7 @@ pub fn sample_goe(n: usize) -> Array2<f64> {
 /// Level spacing ratio for eigenvalue sequence.
 ///
 /// The ratio r_i = min(s_i, s_{i+1}) / max(s_i, s_{i+1}) where s_i = lambda_{i+1} - lambda_i.
+/// A pair with one zero gap contributes zero. A pair with two zero gaps is omitted.
 /// For GOE: mean ~ 0.5307. For Poisson (uncorrelated): mean ~ 0.3863.
 ///
 /// # Arguments
@@ -292,8 +293,9 @@ pub fn level_spacing_ratios(eigenvalues: &[f64]) -> Vec<f64> {
         let s1 = eigenvalues[i + 1] - eigenvalues[i];
         let s2 = eigenvalues[i + 2] - eigenvalues[i + 1];
 
-        if s1 > 0.0 && s2 > 0.0 {
-            ratios.push(s1.min(s2) / s1.max(s2));
+        let larger = s1.max(s2);
+        if s1 >= 0.0 && s2 >= 0.0 && larger > 0.0 {
+            ratios.push(s1.min(s2) / larger);
         }
     }
 
@@ -630,6 +632,15 @@ mod tests {
                 "spacing ratio should be in [0, 1]"
             );
         }
+    }
+
+    #[test]
+    fn tied_levels_contribute_defined_zero_ratios() {
+        // Gaps 1, 0, 0, 2, 2. Only the middle 0/0 pair is undefined.
+        let levels = [0.0, 1.0, 1.0, 1.0, 3.0, 5.0];
+        assert_eq!(level_spacing_ratios(&levels), [0.0, 0.0, 1.0]);
+        assert_eq!(mean_spacing_ratio(&levels), 1.0 / 3.0);
+        assert!(level_spacing_ratios(&[1.0, 1.0, 1.0]).is_empty());
     }
 
     #[test]
